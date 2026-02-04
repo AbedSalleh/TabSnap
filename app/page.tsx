@@ -129,21 +129,19 @@ export default function Home() {
         codec: ScrcpyVideoCodecId.H264,
         // @ts-ignore
         // @ts-ignore
-        renderer: (frame: any) => {
-          console.log("Frame received:", frame.displayWidth, frame.displayHeight);
-          if (canvasRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) {
-              if (canvasRef.current.width !== frame.displayWidth || canvasRef.current.height !== frame.displayHeight) {
-                canvasRef.current.width = frame.displayWidth;
-                canvasRef.current.height = frame.displayHeight;
-              }
-              ctx.drawImage(frame, 0, 0);
-              frame.close();
-            } else {
-              frame.close();
+        // @ts-ignore
+        renderer: {
+          setSize: (width: number, height: number) => {
+            if (canvasRef.current) {
+              canvasRef.current.width = width;
+              canvasRef.current.height = height;
             }
-          } else {
+          },
+          draw: (frame: any) => {
+            const ctx = canvasRef.current?.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(frame, 0, 0);
+            }
             frame.close();
           }
         }
