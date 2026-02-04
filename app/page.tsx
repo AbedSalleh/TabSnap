@@ -5,8 +5,8 @@ import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video,
 import { AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
 import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
-import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
-import { ScrcpyOptions2_4, ScrcpyVideoCodecId } from '@yume-chan/scrcpy';
+import { AdbScrcpyClient, AdbScrcpyOptions2_4 } from '@yume-chan/adb-scrcpy';
+import { ScrcpyVideoCodecId } from '@yume-chan/scrcpy';
 import { WebCodecsVideoDecoder } from '@yume-chan/scrcpy-decoder-webcodecs';
 import { Consumable, ReadableStream } from '@yume-chan/stream-extra';
 import GIF from 'gif.js';
@@ -117,7 +117,7 @@ export default function Home() {
         adb,
         '/data/local/tmp/scrcpy-server.jar',
         // @ts-ignore
-        new ScrcpyOptions2_4({
+        new AdbScrcpyOptions2_4({
           audio: false,
           maxSize: 1024,
           videoBitRate: 4_000_000,
@@ -531,13 +531,13 @@ export default function Home() {
                 <Cast className="w-4 h-4" /> {mirroring ? 'Stop Mirror' : 'Mirror'}
               </button>
 
-              <button
+              {/* <button
                 onClick={enableWireless}
                 className="text-neutral-500 hover:text-indigo-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20"
                 title="Enable Wireless Debugging"
               >
                 <Wifi className="w-4 h-4" /> Wireless
-              </button>
+              </button> */}
 
               <button
                 onClick={disconnectDevice}
