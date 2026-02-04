@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb } from 'lucide-react';
+import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film } from 'lucide-react';
 import { AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
 import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
@@ -12,6 +12,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+
+  // Screen Recording State
+  const [mode, setMode] = useState<'screenshot' | 'video'>('screenshot');
+  const [recording, setRecording] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
   // Connect to USB Device
   const connectDevice = useCallback(async () => {
@@ -96,6 +101,76 @@ export default function Home() {
     }
   };
 
+  const startRecording = async () => {
+    if (!adb) return;
+    setLoading(true);
+    setError(null);
+    setVideoSrc(null);
+    try {
+      // Start screenrecord in background.
+      // We assume it runs until we kill it. 
+      // Using --time-limit 180 (3 mins) as a safety fallback.
+      await adb.subprocess.noneProtocol.spawn('screenrecord --time-limit 180 /sdcard/tabsnap_rec.mp4');
+      setRecording(true);
+    } catch (err: any) {
+      console.error('Start recording failed:', err);
+      setError(err.message);
+      setRecording(false);
+    } finally {
+      // Note: We don't verify if it actually started successfully here 
+      // because spawn returns a process that might fail later.
+      // Ideally we'd monitor stderr, but for now we assume success.
+      setLoading(false);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!adb) return;
+    setLoading(true);
+    try {
+      // 1. Send SIGINT (-2) to screenrecord to finalize MP4 header propery
+      await adb.subprocess.noneProtocol.spawn('pkill -2 screenrecord');
+
+      // 2. Wait for it to write the file
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // 3. Pull file
+      // Check if sync service is available
+      const sync = await adb.sync();
+      const content = sync.read('/sdcard/tabsnap_rec.mp4');
+
+      // 4. Read to Blob
+      const chunks: Uint8Array[] = [];
+      const reader = content.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Cast chunks to any to avoid TS ArrayBufferLike mismatch
+      const blob = new Blob(chunks as any[], { type: 'video/mp4' });
+      if (blob.size < 1024) throw new Error("Recording failed or file empty");
+
+      setVideoSrc(URL.createObjectURL(blob));
+      setRecording(false);
+
+      // 5. Cleanup
+      await adb.subprocess.noneProtocol.spawn('rm /sdcard/tabsnap_rec.mp4');
+
+    } catch (err: any) {
+      console.error('Stop recording failed:', err);
+      setError(err.message);
+      setRecording(false); // Force stop state on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const copyToClipboard = async () => {
     if (!imageSrc) return;
     try {
@@ -129,7 +204,26 @@ export default function Home() {
             Connect your device via USB and extract screenshots instantly.
             <br /><span className="text-sm text-neutral-500">(WebUSB supported browsers only)</span>
           </p>
+
         </div>
+
+        {/* Mode Toggle */}
+        {adb && !recording && (
+          <div className="flex bg-neutral-900 p-1 rounded-xl border border-white/10">
+            <button
+              onClick={() => setMode('screenshot')}
+              className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${mode === 'screenshot' ? 'bg-neutral-800 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+            >
+              <Camera className="w-4 h-4" /> Screenshot
+            </button>
+            <button
+              onClick={() => setMode('video')}
+              className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${mode === 'video' ? 'bg-indigo-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+            >
+              <Video className="w-4 h-4" /> Screen Record
+            </button>
+          </div>
+        )}
 
         {/* Action Area */}
         <div className="relative group flex gap-4">
@@ -144,19 +238,37 @@ export default function Home() {
             </button>
           ) : (
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
-              <button
-                onClick={takeScreenshot}
-                disabled={loading}
-                className="relative px-8 py-4 bg-white text-neutral-950 font-bold rounded-full text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {loading ? (
-                  <RefreshCw className="w-6 h-6 animate-spin" />
-                ) : (
-                  <Camera className="w-6 h-6" />
-                )}
-                {loading ? 'Capturing...' : 'Capture Screenshot'}
-              </button>
+              <div className={`absolute -inset-1 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-1000 ${recording ? 'bg-red-600 animate-pulse' : 'bg-gradient-to-r from-indigo-600 to-purple-600'}`}></div>
+
+              {mode === 'screenshot' ? (
+                <button
+                  onClick={takeScreenshot}
+                  disabled={loading}
+                  className="relative px-8 py-4 bg-white text-neutral-950 font-bold rounded-full text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {loading ? (
+                    <RefreshCw className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <Camera className="w-6 h-6" />
+                  )}
+                  {loading ? 'Capturing...' : 'Capture Screenshot'}
+                </button>
+              ) : (
+                <button
+                  onClick={recording ? stopRecording : startRecording}
+                  disabled={loading}
+                  className={`relative px-8 py-4 font-bold rounded-full text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:pointer-events-none ${recording ? 'bg-red-600 text-white' : 'bg-white text-neutral-950'}`}
+                >
+                  {loading ? (
+                    <RefreshCw className="w-6 h-6 animate-spin" />
+                  ) : recording ? (
+                    <StopCircle className="w-6 h-6" />
+                  ) : (
+                    <Video className="w-6 h-6" />
+                  )}
+                  {loading ? 'Processing...' : recording ? 'Stop Recording' : 'Start Recording'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -170,29 +282,40 @@ export default function Home() {
         )}
 
         {/* Preview Area */}
-        {imageSrc && (
+        {(imageSrc || videoSrc) && (
           <div className="w-full animate-in fade-in zoom-in duration-500 space-y-6">
             <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-neutral-900/50 backdrop-blur-sm mx-auto max-w-3xl aspect-[16/10] flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageSrc} alt="Screenshot" className="max-w-full max-h-full object-contain shadow-lg" />
+              {videoSrc ? (
+                <video
+                  src={videoSrc}
+                  controls
+                  className="max-w-full max-h-full shadow-lg"
+                  autoPlay
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageSrc!} alt="Screenshot" className="max-w-full max-h-full object-contain shadow-lg" />
+              )}
             </div>
 
             <div className="flex justify-center gap-4">
               <a
-                href={imageSrc}
-                download={`screenshot-${Date.now()}.png`}
+                href={videoSrc || imageSrc!}
+                download={videoSrc ? `screenrecord-${Date.now()}.mp4` : `screenshot-${Date.now()}.png`}
                 className="flex items-center gap-2 px-6 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-medium transition-colors border border-white/5"
               >
                 <Download className="w-5 h-5" />
                 Save to Disk
               </a>
-              <button
-                onClick={copyToClipboard}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-medium transition-colors border border-white/5"
-              >
-                <Copy className="w-5 h-5" />
-                Copy to Clipboard
-              </button>
+              {!videoSrc && (
+                <button
+                  onClick={copyToClipboard}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-medium transition-colors border border-white/5"
+                >
+                  <Copy className="w-5 h-5" />
+                  Copy to Clipboard
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -281,6 +404,6 @@ export default function Home() {
         </div>
       </div>
 
-    </main>
+    </main >
   );
 }
