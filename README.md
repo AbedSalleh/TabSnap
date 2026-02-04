@@ -9,9 +9,13 @@ This version uses **WebUSB** to communicate directly from your browser (Chrome/E
 **No backend server is required.** This means you can host this website anywhere (GitHub Pages, Vercel, Netlify) and it will work!
 
 ## ✨ Features
-- **Zero Install**: Just open the URL.
-- **Client-Side Only**: Your data never leaves your browser.
-- **Instant Capture**: Uses `adb exec-out` for fast binary transfer.
+- **Instant Screenshots**: Capture high-resolution screenshots directly to your device.
+- **Screen Recording**: Record seamless video of your Android screen.
+- **Real-Time Mirroring**: View and control your Android screen in your browser with low latency.
+- **GIF Maker**: Convert your screen recordings into shareable GIFs locally.
+- **Device Frames**: Wrap your screenshots in realistic phone/tablet frames.
+- **Wireless Mode**: Instructions for enabling ADB over Wi-Fi.
+- **100% Client-Side**: No data leaves your device. Everything is processed locally in your browser.
 
 ## 🛠️ Prerequisites
 1.  **Supported Browser**: Chrome, Edge, or Opera (WebUSB support).

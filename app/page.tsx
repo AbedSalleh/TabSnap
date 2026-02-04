@@ -149,7 +149,9 @@ export default function Home() {
 
       // Start streaming
       if (client.videoStream) {
-        const stream = await client.videoStream;
+        const video = await client.videoStream;
+        // @ts-ignore
+        const stream = video.stream;
         // @ts-ignore
         stream.pipeTo(decoder.writable).catch(e => {
           console.error("Stream piping error", e);
@@ -493,7 +495,7 @@ export default function Home() {
             Tab<span className="text-indigo-500">Snap</span>
           </h1>
           <p className="text-neutral-400 text-lg max-w-md mx-auto">
-            Connect your device via USB and extract screenshots instantly.
+            Connect your device via USB and extract screenshots or record screen video instantly.
             <br /><span className="text-sm text-neutral-500">(WebUSB supported browsers only)</span>
           </p>
         </div>
