@@ -10,8 +10,7 @@ This version uses **WebUSB** to communicate directly from your browser (Chrome/E
 
 ## ✨ Features
 - **Instant Screenshots**: Capture high-resolution screenshots directly to your device.
-- **Screen Recording**: Record seamless video of your Android screen.
-- **Real-Time Mirroring**: View and control your Android screen in your browser with low latency.
+- **Screen Recording & Mirroring**: Record seamless video while viewing your screen in real-time.
 - **GIF Maker**: Convert your screen recordings into shareable GIFs locally.
 - **Device Frames**: Wrap your screenshots in realistic phone/tablet frames.
 - **Wireless Mode**: Instructions for enabling ADB over Wi-Fi.

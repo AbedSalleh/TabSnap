@@ -250,6 +250,14 @@ export default function Home() {
     setLoading(true);
     try {
       await adb.subprocess.noneProtocol.spawn('pkill -2 screenrecord');
+
+      // Stop mirroring immediately when recording stops
+      if (stopMirror) {
+        stopMirror();
+        setStopMirror(null);
+        setMirroring(false);
+      }
+
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       const sync = await adb.sync();
@@ -273,12 +281,19 @@ export default function Home() {
       setVideoSrc(URL.createObjectURL(blob));
       setRecording(false);
 
+      // Mirroring is already stopped above
+
       await adb.subprocess.noneProtocol.spawn('rm /sdcard/tabsnap_rec.mp4');
 
     } catch (err: any) {
       console.error('Stop recording failed:', err);
       setError(err.message);
       setRecording(false);
+      if (stopMirror) {
+        stopMirror();
+        setStopMirror(null);
+        setMirroring(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -525,7 +540,7 @@ export default function Home() {
             </div>
 
             <div className="flex gap-2">
-              <button
+              {/* <button
                 onClick={async () => {
                   if (mirroring) {
                     stopMirroringAction();
@@ -537,7 +552,7 @@ export default function Home() {
                 title="Real-Time Mirror"
               >
                 <Cast className="w-4 h-4" /> {mirroring ? 'Stop Mirror' : 'Mirror'}
-              </button>
+              </button> */}
 
               {/* <button
                 onClick={enableWireless}
@@ -642,10 +657,10 @@ export default function Home() {
               </button>
 
               <button
-                onClick={stopMirroringAction}
+                onClick={recording ? stopRecording : stopMirroringAction}
                 className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-full font-bold shadow-lg flex items-center gap-2"
               >
-                <StopCircle className="w-5 h-5" /> Stop Mirroring
+                <StopCircle className="w-5 h-5" /> {recording ? 'Stop Recording' : 'Stop Mirroring'}
               </button>
             </div>
           </div>
