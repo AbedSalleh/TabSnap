@@ -9,6 +9,7 @@ import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
 export default function Home() {
   const [adb, setAdb] = useState<Adb | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -17,6 +18,9 @@ export default function Home() {
   const [mode, setMode] = useState<'screenshot' | 'video'>('screenshot');
   const [recording, setRecording] = useState(false);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+
+  // Frame State
+  const [frameStyle, setFrameStyle] = useState<'none' | 'phone' | 'tablet'>('none');
 
   // Connect to USB Device
   const connectDevice = useCallback(async () => {
@@ -30,7 +34,8 @@ export default function Home() {
 
       const device = await Manager.requestDevice();
       if (!device) {
-        throw new Error('No device selected');
+        // User cancelled picker
+        return;
       }
 
       const connection = await device.connect();
@@ -51,7 +56,6 @@ export default function Home() {
     } finally {
       setConnecting(false);
     }
-
   }, []);
 
   const disconnectDevice = async () => {
@@ -65,6 +69,7 @@ export default function Home() {
       setMode('screenshot');
       setImageSrc(null);
       setVideoSrc(null);
+      setFrameStyle('none');
     }
   };
 
@@ -107,6 +112,7 @@ export default function Home() {
 
       const url = URL.createObjectURL(blob);
       setImageSrc(url);
+      setVideoSrc(null); // Clear video if taking screenshot
 
     } catch (err: any) {
       console.error(err);
@@ -121,6 +127,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setVideoSrc(null);
+    setImageSrc(null);
     try {
       // Start screenrecord in background.
       // We assume it runs until we kill it. 
@@ -132,9 +139,6 @@ export default function Home() {
       setError(err.message);
       setRecording(false);
     } finally {
-      // Note: We don't verify if it actually started successfully here 
-      // because spawn returns a process that might fail later.
-      // Ideally we'd monitor stderr, but for now we assume success.
       setLoading(false);
     }
   };
@@ -189,6 +193,10 @@ export default function Home() {
   const copyToClipboard = async () => {
     if (!imageSrc) return;
     try {
+      // If we have a frame, we need to generate it on canvas first to copy it
+      // For simplicity, clipboard copy usually just copies the raw screenshot to avoid async canvas issues on some browsers 
+      // or we just copy the currently visible image src if it's the raw one.
+
       const response = await fetch(imageSrc);
       const blob = await response.blob();
       await navigator.clipboard.write([
@@ -196,10 +204,99 @@ export default function Home() {
           [blob.type]: blob,
         }),
       ]);
-      alert('Copied to clipboard!');
+      alert('Copied original screenshot to clipboard!');
     } catch (err) {
       console.error('Failed to copy', err);
       alert('Failed to copy to clipboard');
+    }
+  };
+
+  const compositeAndDownload = async () => {
+    if (!imageSrc) return;
+
+    // If no frame, just download original
+    if (frameStyle === 'none') {
+      const link = document.createElement('a');
+      link.href = imageSrc;
+      link.download = `screenshot-${Date.now()}.png`;
+      link.click();
+      return;
+    }
+
+    const img = new Image();
+    img.src = imageSrc;
+    await new Promise((resolve) => (img.onload = resolve));
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Frame Definitions (World Class Vector Styles)
+    let padding = 0;
+    let borderRadius = 0;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const aspectRatio = img.width / img.height;
+
+    const BEZEL_COLOR = '#111';
+    const BORDER_COLOR = '#333';
+
+    if (frameStyle === 'phone') {
+      padding = Math.max(img.width, img.height) * 0.04; // 4% bezel
+      borderRadius = Math.max(img.width, img.height) * 0.12; // Round corners
+    } else if (frameStyle === 'tablet') {
+      padding = Math.max(img.width, img.height) * 0.06; // Thicker bezel
+      borderRadius = Math.max(img.width, img.height) * 0.05;
+    }
+
+    // Set Canvas Size
+    canvas.width = img.width + (padding * 2);
+    canvas.height = img.height + (padding * 2);
+
+    // Draw Background (Transparent)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Frame Body (Rounded Rect)
+    ctx.fillStyle = BEZEL_COLOR;
+    ctx.beginPath();
+    // roundRect is newish, fallback to arc logic if needed but modern browsers support it.
+    if (ctx.roundRect) {
+      ctx.roundRect(0, 0, canvas.width, canvas.height, borderRadius);
+    } else {
+      ctx.rect(0, 0, canvas.width, canvas.height); // Fallback
+    }
+    ctx.fill();
+
+    // Draw Border stroke
+    ctx.strokeStyle = BORDER_COLOR;
+    ctx.lineWidth = padding * 0.15;
+    ctx.stroke();
+
+    // Draw Image
+    ctx.drawImage(img, padding, padding, img.width, img.height);
+
+    // Draw Camera Notch/Island (Phone only)
+    if (frameStyle === 'phone') {
+      ctx.fillStyle = '#000';
+      // Dynamic Island style pill
+      const pillW = canvas.width * 0.3;
+      const pillH = padding * 0.8;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect((canvas.width / 2) - (pillW / 2), padding * 0.5, pillW, pillH, pillH / 2);
+      } else {
+        ctx.rect((canvas.width / 2) - (pillW / 2), padding * 0.5, pillW, pillH);
+      }
+      ctx.fill();
+    }
+
+    // Export
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `tabsnap-${frameStyle}-${Date.now()}.png`;
+      link.click();
     }
   };
 
@@ -219,12 +316,11 @@ export default function Home() {
             Connect your device via USB and extract screenshots instantly.
             <br /><span className="text-sm text-neutral-500">(WebUSB supported browsers only)</span>
           </p>
-
         </div>
 
         {/* Mode Toggle */}
         {adb && !recording && (
-          <div className="flex flex-col md:flex-row gap-4 items-center">
+          <div className="flex flex-col md:flex-row gap-4 items-center animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex bg-neutral-900 p-1 rounded-xl border border-white/10">
               <button
                 onClick={() => setMode('screenshot')}
@@ -242,7 +338,7 @@ export default function Home() {
 
             <button
               onClick={disconnectDevice}
-              className="text-neutral-500 hover:text-red-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-lg transition-colors"
+              className="text-neutral-500 hover:text-red-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
             >
               <LogOut className="w-4 h-4" /> Disconnect
             </button>
@@ -308,29 +404,71 @@ export default function Home() {
         {/* Preview Area */}
         {(imageSrc || videoSrc) && (
           <div className="w-full animate-in fade-in zoom-in duration-500 space-y-6">
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-neutral-900/50 backdrop-blur-sm mx-auto max-w-3xl aspect-[16/10] flex items-center justify-center">
-              {videoSrc ? (
-                <video
-                  src={videoSrc}
-                  controls
-                  className="max-w-full max-h-full shadow-lg"
-                  autoPlay
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageSrc!} alt="Screenshot" className="max-w-full max-h-full object-contain shadow-lg" />
-              )}
+
+            {/* Frame Selector (Only for Screenshots) */}
+            {imageSrc && !videoSrc && (
+              <div className="flex justify-center gap-2 mb-4 bg-neutral-900/80 p-1.5 rounded-full border border-white/5 backdrop-blur-md w-fit mx-auto">
+                <button onClick={() => setFrameStyle('none')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${frameStyle === 'none' ? 'bg-white text-black shadow-md' : 'text-neutral-400 hover:text-white'}`}>
+                  No Frame
+                </button>
+                <button onClick={() => setFrameStyle('phone')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${frameStyle === 'phone' ? 'bg-white text-black shadow-md' : 'text-neutral-400 hover:text-white'}`}>
+                  Phone
+                </button>
+                <button onClick={() => setFrameStyle('tablet')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${frameStyle === 'tablet' ? 'bg-white text-black shadow-md' : 'text-neutral-400 hover:text-white'}`}>
+                  Tablet
+                </button>
+              </div>
+            )}
+
+            <div className={`relative flex items-center justify-center p-8 min-h-[50vh] transition-all duration-500 ${frameStyle !== 'none' ? 'scale-95' : 'scale-100'}`}>
+              {/* CSS Preview Layer */}
+              <div
+                className={`relative shadow-2xl transition-all duration-500 ease-spring ${frameStyle === 'none' ? '' :
+                    frameStyle === 'phone' ? 'p-3 bg-neutral-900 rounded-[2.5rem] ring-4 ring-neutral-800 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]' :
+                      'p-6 bg-neutral-800 rounded-[2rem] ring-4 ring-neutral-700 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]'
+                  }`}
+                style={{
+                  boxShadow: frameStyle !== 'none' ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : undefined
+                }}
+              >
+                {/* Notch Simulation for CSS Preview */}
+                {frameStyle === 'phone' && (
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[30%] h-7 bg-black rounded-full z-10 pointer-events-none shadow-sm"></div>
+                )}
+
+                {videoSrc ? (
+                  <video
+                    src={videoSrc}
+                    controls
+                    className={`max-w-full max-h-[60vh] object-contain ${frameStyle !== 'none' ? 'rounded-2xl' : 'rounded-lg shadow-lg'}`}
+                    autoPlay
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imageSrc!}
+                    alt="Screenshot"
+                    className={`max-w-full max-h-[60vh] object-contain ${frameStyle !== 'none' ? 'rounded-[1.8rem]' : 'rounded-lg shadow-lg'}`}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="flex justify-center gap-4">
-              <a
-                href={videoSrc || imageSrc!}
-                download={videoSrc ? `screenrecord-${Date.now()}.mp4` : `screenshot-${Date.now()}.png`}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-medium transition-colors border border-white/5"
+              <button
+                onClick={videoSrc ? () => {
+                  // Video download
+                  const link = document.createElement('a');
+                  link.href = videoSrc;
+                  link.download = `screenrecord-${Date.now()}.mp4`;
+                  link.click();
+                } : compositeAndDownload}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-neutral-900 hover:bg-neutral-200 font-bold transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
                 <Download className="w-5 h-5" />
-                Save to Disk
-              </a>
+                {frameStyle === 'none' || videoSrc ? 'Save to Disk' : 'Save with Frame'}
+              </button>
+
               {!videoSrc && (
                 <button
                   onClick={copyToClipboard}
@@ -343,43 +481,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
-      </div>
-
-      {/* Help Section */}
-      <div className="max-w-3xl w-full mt-24 grid gap-8 md:grid-cols-2 text-left">
-
-        {/* Android Setup */}
-        <div className="space-y-4 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Smartphone className="w-5 h-5 text-indigo-400" />
-            Android Setup
-          </h3>
-          <ol className="list-decimal list-inside space-y-2 text-neutral-400 text-sm">
-            <li>Go to <strong>Settings {'>'} About Phone</strong>.</li>
-            <li>Tap <strong>Build Number</strong> 7 times.</li>
-            <li>Go to <strong>System {'>'} Developer Options</strong>.</li>
-            <li>Enable <strong>USB Debugging</strong>.</li>
-            <li>Connect USB and tap <strong>Allow</strong> on phone.</li>
-          </ol>
-        </div>
-
-        {/* Windows Setup */}
-        <div className="space-y-4 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <svg role="img" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-blue-400"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" /></svg>
-            Windows Users
-          </h3>
-          <div className="space-y-3 text-neutral-400 text-sm">
-            <p><strong className="text-white">Device in use?</strong> Close <em>Phone Link</em>, <em>Samsung DeX</em>, or other adb tools.</p>
-            <p><strong className="text-white">Driver Issue?</strong> Use <a href="https://zadig.akeo.ie/" target="_blank" className="text-indigo-400 hover:underline">Zadig</a>:</p>
-            <ul className="list-disc list-inside pl-1 space-y-1">
-              <li>List All Devices {'>'} Select <strong>ADB Interface</strong></li>
-              <li>Select <strong>WinUSB</strong> target</li>
-              <li>Click <em>Replace Driver</em> or <em>Downgrade WCID</em></li>
-            </ul>
-          </div>
-        </div>
 
       </div>
 
@@ -403,21 +504,16 @@ export default function Home() {
           </article>
 
           <article>
+            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Device in use error?</h3>
             <p className="mb-4">
               On Windows, other applications like <strong>Phone Link</strong> or <strong>Samsung DeX</strong> often fight for control. Also, <strong>you can only connect to one Browser Tab at a time</strong>. If you have TabSnap open in another tab (or localhost), you must click <strong>Disconnect</strong> or close that tab first!
             </p>
           </article>
 
           <article>
-            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Supported Devices</h3>
-            <p>
-              TabSnap works with almost all Android devices including:
-              <ul className="list-disc list-inside mt-2 ml-2">
-                <li>Samsung Galaxy S23, S24, Tab S9</li>
-                <li>Google Pixel 7, 8, 9</li>
-                <li>Xiaomi, OnePlus, and Oppo devices</li>
-                <li>Any device with USB Debugging enabled</li>
-              </ul>
+            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Does it record Audio?</h3>
+            <p className="mb-4">
+              Currently, Android's `screenrecord` command only captures video (silent). We are working on a method to capture audio in a future update!
             </p>
           </article>
         </div>
@@ -427,6 +523,6 @@ export default function Home() {
         </div>
       </div>
 
-    </main >
+    </main>
   );
 }
