@@ -1,46 +1,33 @@
-# TabSnap - USB Screenshot Tool
+# TabSnap - WebUSB Screenshot Tool
 
-A modern, local web application to capture high-quality screenshots from your Android device via USB. Built with Next.js and ADB.
+A serverless, browser-based tool to capture screenshots from your Android device using **WebUSB**.
 
 ![Screenshot Preview](./public/preview.png)
 
-## 🚀 Why Local?
-This tool communicates directly with your Android device via USB using `adb` (Android Debug Bridge). Because browsers generally cannot run system-level binary commands like `adb.exe` directly for security reasons, **this app must be run locally on your computer** to bridge the connection. It cannot be hosted as a static page (e.g., GitHub Pages) while retaining standard ADB functionality.
+## 🚀 How it Works
+This version uses **WebUSB** to communicate directly from your browser (Chrome/Edge) to your Android device. 
+**No backend server is required.** This means you can host this website anywhere (GitHub Pages, Vercel, Netlify) and it will work!
 
 ## ✨ Features
-- **Instant Capture**: One-click screenshot from USB-connected device.
-- **Clipboard Integration**: Copy images directly to clipboard.
-- **Binary Safe**: Handles data properly to ensure no image corruption.
-- **Modern UI**: Dark mode, glassmorphism, and smooth animations.
+- **Zero Install**: Just open the URL.
+- **Client-Side Only**: Your data never leaves your browser.
+- **Instant Capture**: Uses `adb exec-out` for fast binary transfer.
 
 ## 🛠️ Prerequisites
-1.  **Node.js**: [Download & Install](https://nodejs.org/)
-2.  **ADB Drivers**: Ensure your device drivers are installed.
-3.  **USB Debugging**: Enabled on your Android device (Developer Options).
+1.  **Supported Browser**: Chrome, Edge, or Opera (WebUSB support).
+2.  **ADB Drivers**: 
+    -   **Windows**: You might need to install the **WinUSB** driver for your device using [Zadig](https://zadig.akeo.ie/) if the standard driver doesn't work with WebUSB.
+    -   **macOS/Linux**: Usually works out of the box (Linux needs udev rules).
+3.  **USB Debugging**: Enabled on your Android device.
 
-## 🏃‍♂️ How to Run "Anytime"
-Since this is a local tool, you can run it whenever you need it:
+## 🏃‍♂️ Development
+```bash
+npm install
+npm run dev
+```
 
-1.  **Clone this repo**:
-    ```bash
-    git clone https://github.com/YourUsername/TabSnap.git
-    cd TabSnap
-    ```
-
-2.  **Install Dependencies** (First time only):
-    ```bash
-    npm install
-    ```
-
-3.  **Start the App**:
-    ```bash
-    npm run dev
-    ```
-
-4.  **Open**: [http://localhost:3000](http://localhost:3000)
-
-## 🔧 Configuration
-The app attempts to locate `adb.exe` automatically. If it fails, check `lib/adb.ts` or ensure `adb` is in your system PATH.
+## 🔧 Troubleshooting
+- **"Access Denied"**: Ensure no other ADB process (like Android Studio or standard `adb.exe`) is holding the connection. detailed instructions [here](https://github.com/yume-chan/ya-webadb).
 
 ## 📄 License
 MIT

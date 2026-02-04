@@ -1,29 +1,93 @@
 'use client';
 
-import { useState } from 'react';
-import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb } from 'lucide-react';
+import { AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
+import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
+import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
 
 export default function Home() {
+  const [adb, setAdb] = useState<Adb | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  // Connect to USB Device
+  const connectDevice = useCallback(async () => {
+    setConnecting(true);
+    setError(null);
+    try {
+      const Manager = AdbDaemonWebUsbDeviceManager.BROWSER;
+      if (!Manager) {
+        throw new Error('WebUSB is not supported in this browser');
+      }
+
+      const device = await Manager.requestDevice();
+      if (!device) {
+        throw new Error('No device selected');
+      }
+
+      const connection = await device.connect();
+
+      const CredentialStore = new AdbWebCredentialStore();
+      const transport = await AdbDaemonTransport.authenticate({
+        serial: device.serial,
+        connection,
+        credentialStore: CredentialStore,
+      });
+
+      const adbClient = new Adb(transport);
+
+      setAdb(adbClient);
+    } catch (err: any) {
+      console.error('Connection failed:', err);
+      setError(err.message || 'Failed to connect to device');
+    } finally {
+      setConnecting(false);
+    }
+  }, []);
 
   const takeScreenshot = async () => {
+    if (!adb) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/snap');
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to take screenshot');
+      // Execute screencap -p
+      // noneProtocol uses 'exec:' which is binary-safe
+      const process = await adb.subprocess.noneProtocol.spawn('screencap -p');
+
+      // Read output into chunks
+      const chunks: Uint8Array[] = [];
+      const reader = process.output.getReader();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
       }
-      const blob = await res.blob();
-      console.log('Received blob size:', blob.size);
+
+      // Concatenate chunks
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const combined = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const blob = new Blob([combined], { type: 'image/png' });
       if (blob.size < 100) {
-        throw new Error(`Received empty or too small image (size: ${blob.size} bytes)`);
+        throw new Error('Screenshot failed or is empty');
       }
+
       const url = URL.createObjectURL(blob);
       setImageSrc(url);
+
     } catch (err: any) {
       console.error(err);
       setError(err.message);
@@ -63,26 +127,38 @@ export default function Home() {
           </h1>
           <p className="text-neutral-400 text-lg max-w-md mx-auto">
             Connect your device via USB and extract screenshots instantly.
+            <br /><span className="text-sm text-neutral-500">(WebUSB supported browsers only)</span>
           </p>
         </div>
 
         {/* Action Area */}
-        <div className="relative group">
-          {/* Glow effect */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
-
-          <button
-            onClick={takeScreenshot}
-            disabled={loading}
-            className="relative px-8 py-4 bg-white text-neutral-950 font-bold rounded-full text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {loading ? (
-              <RefreshCw className="w-6 h-6 animate-spin" />
-            ) : (
-              <Camera className="w-6 h-6" />
-            )}
-            {loading ? 'Capturing...' : 'Capture Screenshot'}
-          </button>
+        <div className="relative group flex gap-4">
+          {!adb ? (
+            <button
+              onClick={connectDevice}
+              disabled={connecting}
+              className="relative px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-full text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+            >
+              <Usb className="w-6 h-6" />
+              {connecting ? 'Connecting...' : 'Connect Device'}
+            </button>
+          ) : (
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-1000"></div>
+              <button
+                onClick={takeScreenshot}
+                disabled={loading}
+                className="relative px-8 py-4 bg-white text-neutral-950 font-bold rounded-full text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {loading ? (
+                  <RefreshCw className="w-6 h-6 animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6" />
+                )}
+                {loading ? 'Capturing...' : 'Capture Screenshot'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Error Display */}
