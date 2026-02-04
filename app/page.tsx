@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film, LogOut, Wifi } from 'lucide-react';
+import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film, LogOut, Wifi, FileVideo } from 'lucide-react';
 import { AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
 import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
+import GIF from 'gif.js';
 
 export default function Home() {
   const [adb, setAdb] = useState<Adb | null>(null);
@@ -22,6 +23,76 @@ export default function Home() {
   // Frame State
   const [frameStyle, setFrameStyle] = useState<'none' | 'phone' | 'tablet'>('none');
   const [wirelessIp, setWirelessIp] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
+
+  // ... (connectDevice) ...
+
+  const convertToGif = async () => {
+    if (!videoSrc) return;
+    setConverting(true);
+    setError(null);
+
+    try {
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        workerScript: 'gif.worker.js', // Path to public worker
+        width: 360, // Downscale for GIF performance
+        height: 640 // Aspect ratio adjustment needed? We'll detect. 
+        // Actually better to let canvas decide or play video once to get dims.
+      });
+
+      const video = document.createElement('video');
+      video.src = videoSrc;
+      video.muted = true;
+      await video.play();
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Downscale to 30% for GIF size (GIFs are huge)
+      const scale = 0.3;
+      canvas.width = video.videoWidth * scale;
+      canvas.height = video.videoHeight * scale;
+
+      (gif as any).options.width = canvas.width;
+      (gif as any).options.height = canvas.height;
+
+      // Capture frames
+      const fps = 10; // Low FPS for GIF
+      const duration = video.duration;
+      const interval = 1 / fps;
+
+      video.pause();
+      video.currentTime = 0;
+
+      for (let t = 0; t < duration; t += interval) {
+        video.currentTime = t;
+        // Wait for seek
+        await new Promise(r => video.onseeked = r);
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          gif.addFrame(ctx, { copy: true, delay: interval * 1000 });
+        }
+      }
+
+      gif.on('finished', (blob) => {
+        setConverting(false);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `tabsnap-gif-${Date.now()}.gif`;
+        link.click();
+      });
+
+      gif.render();
+
+    } catch (e: any) {
+      console.error(e);
+      setError("GIF Conversion Failed: " + e.message);
+      setConverting(false);
+    }
+  };
 
   // Connect to USB Device
   const connectDevice = useCallback(async () => {
@@ -521,7 +592,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex justify-center gap-4">
+            <div className="flex justify-center gap-4 flex-wrap">
               <button
                 onClick={videoSrc ? () => {
                   // Video download
@@ -535,6 +606,17 @@ export default function Home() {
                 <Download className="w-5 h-5" />
                 {frameStyle === 'none' || videoSrc ? 'Save to Disk' : 'Save with Frame'}
               </button>
+
+              {videoSrc && (
+                <button
+                  onClick={convertToGif}
+                  disabled={converting}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors border border-white/5 shadow-lg"
+                >
+                  {converting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <FileVideo className="w-5 h-5" />}
+                  {converting ? 'Converting...' : 'Save as GIF'}
+                </button>
+              )}
 
               {!videoSrc && (
                 <button
