@@ -128,7 +128,9 @@ export default function Home() {
       const decoder = new WebCodecsVideoDecoder({
         codec: ScrcpyVideoCodecId.H264,
         // @ts-ignore
+        // @ts-ignore
         renderer: (frame: any) => {
+          console.log("Frame received:", frame.displayWidth, frame.displayHeight);
           if (canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) {
@@ -619,12 +621,29 @@ export default function Home() {
               />
             </div>
 
-            <button
-              onClick={stopMirroringAction}
-              className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-full font-bold shadow-lg flex items-center gap-2"
-            >
-              <StopCircle className="w-5 h-5" /> Stop Mirroring
-            </button>
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  if (canvasRef.current) {
+                    const url = canvasRef.current.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `mirror-snapshot-${Date.now()}.png`;
+                    link.click();
+                  }
+                }}
+                className="px-6 py-3 bg-neutral-700 hover:bg-neutral-600 text-white rounded-full font-bold shadow-lg flex items-center gap-2"
+              >
+                <Camera className="w-5 h-5" /> Snapshot
+              </button>
+
+              <button
+                onClick={stopMirroringAction}
+                className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-full font-bold shadow-lg flex items-center gap-2"
+              >
+                <StopCircle className="w-5 h-5" /> Stop Mirroring
+              </button>
+            </div>
           </div>
         )}
 
