@@ -198,6 +198,43 @@ export default function Home() {
         )}
 
       </div>
+
+      {/* Help Section */}
+      <div className="max-w-3xl w-full mt-24 grid gap-8 md:grid-cols-2 text-left">
+
+        {/* Android Setup */}
+        <div className="space-y-4 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-indigo-400" />
+            Android Setup
+          </h3>
+          <ol className="list-decimal list-inside space-y-2 text-neutral-400 text-sm">
+            <li>Go to <strong>Settings {'>'} About Phone</strong>.</li>
+            <li>Tap <strong>Build Number</strong> 7 times.</li>
+            <li>Go to <strong>System {'>'} Developer Options</strong>.</li>
+            <li>Enable <strong>USB Debugging</strong>.</li>
+            <li>Connect USB and tap <strong>Allow</strong> on phone.</li>
+          </ol>
+        </div>
+
+        {/* Windows Setup */}
+        <div className="space-y-4 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <svg role="img" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-blue-400"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" /></svg>
+            Windows Users
+          </h3>
+          <div className="space-y-3 text-neutral-400 text-sm">
+            <p><strong className="text-white">Device in use?</strong> Close <em>Phone Link</em>, <em>Samsung DeX</em>, or other adb tools.</p>
+            <p><strong className="text-white">Driver Issue?</strong> Use <a href="https://zadig.akeo.ie/" target="_blank" className="text-indigo-400 hover:underline">Zadig</a>:</p>
+            <ul className="list-disc list-inside pl-1 space-y-1">
+              <li>List All Devices {'>'} Select <strong>ADB Interface</strong></li>
+              <li>Select <strong>WinUSB</strong> target</li>
+              <li>Click <em>Replace Driver</em> or <em>Downgrade WCID</em></li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
     </main>
   );
 }
