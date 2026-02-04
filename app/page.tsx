@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film } from 'lucide-react';
+import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film, LogOut } from 'lucide-react';
 import { AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
 import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
@@ -51,7 +51,22 @@ export default function Home() {
     } finally {
       setConnecting(false);
     }
+
   }, []);
+
+  const disconnectDevice = async () => {
+    if (adb) {
+      try {
+        await adb.transport.close();
+      } catch (e) {
+        console.error('Disconnect failed', e);
+      }
+      setAdb(null);
+      setMode('screenshot');
+      setImageSrc(null);
+      setVideoSrc(null);
+    }
+  };
 
   const takeScreenshot = async () => {
     if (!adb) return;
@@ -209,18 +224,27 @@ export default function Home() {
 
         {/* Mode Toggle */}
         {adb && !recording && (
-          <div className="flex bg-neutral-900 p-1 rounded-xl border border-white/10">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="flex bg-neutral-900 p-1 rounded-xl border border-white/10">
+              <button
+                onClick={() => setMode('screenshot')}
+                className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${mode === 'screenshot' ? 'bg-neutral-800 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+              >
+                <Camera className="w-4 h-4" /> Screenshot
+              </button>
+              <button
+                onClick={() => setMode('video')}
+                className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${mode === 'video' ? 'bg-indigo-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+              >
+                <Video className="w-4 h-4" /> Screen Record
+              </button>
+            </div>
+
             <button
-              onClick={() => setMode('screenshot')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${mode === 'screenshot' ? 'bg-neutral-800 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+              onClick={disconnectDevice}
+              className="text-neutral-500 hover:text-red-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-lg transition-colors"
             >
-              <Camera className="w-4 h-4" /> Screenshot
-            </button>
-            <button
-              onClick={() => setMode('video')}
-              className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${mode === 'video' ? 'bg-indigo-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
-            >
-              <Video className="w-4 h-4" /> Screen Record
+              <LogOut className="w-4 h-4" /> Disconnect
             </button>
           </div>
         )}
@@ -379,9 +403,8 @@ export default function Home() {
           </article>
 
           <article>
-            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Why does it say "Device in use"?</h3>
             <p className="mb-4">
-              On Windows, other applications like <strong>Phone Link</strong> or <strong>Samsung DeX</strong> often fight for control of the USB device. You need to close them or use the "ADB Interface" driver (WinUSB) via Zadig for the browser to access it.
+              On Windows, other applications like <strong>Phone Link</strong> or <strong>Samsung DeX</strong> often fight for control. Also, <strong>you can only connect to one Browser Tab at a time</strong>. If you have TabSnap open in another tab (or localhost), you must click <strong>Disconnect</strong> or close that tab first!
             </p>
           </article>
 

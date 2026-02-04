@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TabSnap - Capture Android Screenshots Online (No App Required)",
-  description: "Free online tool to take screenshots of your Android device wirelessly or via USB directly in your browser. No app installation needed. Works with Samsung, Pixel, Xiaomi, and more.",
+  title: "TabSnap - Capture & Record Android Screen Online (No No Install)",
+  description: "Free online tool to take screenshots and record video of your Android device directly in your browser. No app installation needed. Supports 1080p recording.",
   keywords: [
+    "android screen recorder online",
     "android screenshot to pc",
-    "view android screen on pc",
-    "adb screenshot online",
+    "record android screen no root",
+    "adb screenrecord online",
     "webusb adb",
-    "capture android screen without root",
-    "samsung screenshot tool",
-    "pixel screenshot to computer",
+    "samsung screen recorder",
+    "pixel screen recording",
     "online android debugger",
     "android screen capture no app"
   ],
