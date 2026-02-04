@@ -235,6 +235,52 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* SEO Content / FAQ */}
+      <div className="max-w-4xl w-full mt-24 pt-12 border-t border-white/5 text-neutral-400 text-sm">
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">Frequently Asked Questions</h2>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <article>
+            <h3 className="text-lg font-semibold text-neutral-200 mb-2">How to take a screenshot of Android on PC?</h3>
+            <p className="mb-4">
+              TabSnap allows you to capture high-quality screenshots from your Android phone or tablet directly to your computer using your USB cable. It works using WebUSB technology, so you don't need to install any heavy software like Android Studio.
+            </p>
+          </article>
+
+          <article>
+            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Is TabSnap safe to use?</h3>
+            <p className="mb-4">
+              Yes. TabSnap runs entirely in your browser (Client-Side). Your screen data goes directly from your USB cable to your Chrome/Edge browser. No data is sent to any external server or cloud.
+            </p>
+          </article>
+
+          <article>
+            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Why does it say "Device in use"?</h3>
+            <p className="mb-4">
+              On Windows, other applications like <strong>Phone Link</strong> or <strong>Samsung DeX</strong> often fight for control of the USB device. You need to close them or use the "ADB Interface" driver (WinUSB) via Zadig for the browser to access it.
+            </p>
+          </article>
+
+          <article>
+            <h3 className="text-lg font-semibold text-neutral-200 mb-2">Supported Devices</h3>
+            <p>
+              TabSnap works with almost all Android devices including:
+              <ul className="list-disc list-inside mt-2 ml-2">
+                <li>Samsung Galaxy S23, S24, Tab S9</li>
+                <li>Google Pixel 7, 8, 9</li>
+                <li>Xiaomi, OnePlus, and Oppo devices</li>
+                <li>Any device with USB Debugging enabled</li>
+              </ul>
+            </p>
+          </article>
+        </div>
+
+        <div className="mt-12 text-center text-xs text-neutral-600">
+          <p>TabSnap is a free online ADB Screenshot Tool. No sign-up required. Open Source.</p>
+        </div>
+      </div>
+
     </main>
   );
 }
