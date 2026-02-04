@@ -227,6 +227,12 @@ export default function Home() {
     setError(null);
     setVideoSrc(null);
     setImageSrc(null);
+
+    // Auto-start mirroring so user can see what they are recording
+    if (!mirroring) {
+      startMirroring().catch(e => console.error("Auto-mirror failed", e));
+    }
+
     try {
       await adb.subprocess.noneProtocol.spawn('screenrecord --time-limit 180 /sdcard/tabsnap_rec.mp4');
       setRecording(true);
@@ -333,10 +339,9 @@ export default function Home() {
     try {
       const gif = new GIF({
         workers: 2,
-        quality: 10,
+        quality: 5, // Better quality
         workerScript: 'gif.worker.js',
-        width: 360,
-        height: 640
+        // width/height set dynamically
       });
 
       const video = document.createElement('video');
@@ -347,7 +352,8 @@ export default function Home() {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      const scale = 0.3;
+      // Higher scale for better visibility (was 0.3)
+      const scale = 0.8;
       canvas.width = video.videoWidth * scale;
       canvas.height = video.videoHeight * scale;
 
