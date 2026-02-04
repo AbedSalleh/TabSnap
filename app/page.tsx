@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film, LogOut } from 'lucide-react';
+import { Camera, Download, Copy, RefreshCw, Smartphone, AlertCircle, Usb, Video, StopCircle, Film, LogOut, Wifi } from 'lucide-react';
 import { AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
 import AdbWebCredentialStore from '@yume-chan/adb-credential-web';
@@ -21,6 +21,7 @@ export default function Home() {
 
   // Frame State
   const [frameStyle, setFrameStyle] = useState<'none' | 'phone' | 'tablet'>('none');
+  const [wirelessIp, setWirelessIp] = useState<string | null>(null);
 
   // Connect to USB Device
   const connectDevice = useCallback(async () => {
@@ -70,6 +71,62 @@ export default function Home() {
       setImageSrc(null);
       setVideoSrc(null);
       setFrameStyle('none');
+    }
+  };
+
+  const enableWireless = async () => {
+    if (!adb) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Get IP Address
+      // Output example: "192.168.1.0/24 dev wlan0 proto kernel scope link src 192.168.1.5"
+      const process = await adb.subprocess.noneProtocol.spawn('ip route');
+      const reader = process.output.getReader();
+      let output = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          output += new TextDecoder().decode(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      const match = output.match(/src\s+(\d+\.\d+\.\d+\.\d+)/);
+      if (!match) {
+        throw new Error('Could not find device IP address. Is WiFi connected?');
+      }
+      const ip = match[1];
+
+      // 2. Enable TCP/IP on port 5555
+      // This corresponds to `adb tcpip 5555`
+      // @ts-ignore - tcpip might be hidden property
+      if (adb.tcpip) {
+        // @ts-ignore
+        await adb.tcpip.setPort(5555);
+      } else {
+        // Try to execute it as a shell command anyway just in case (e.g. root) 
+        // or fail gracefully. Note that typical non-root shell cannot do this.
+        // BUT, yume-chan adb usually has it.
+        throw new Error("TCP/IP command not supported by this library version.");
+      }
+
+      setWirelessIp(ip);
+      // Using a simple alert for now, could be a modal later
+      alert(`Wireless Enabled! 📡\n\n1. Unplug your USB cable.\n2. Run this on your PC (or new tab):\n\nadb connect ${ip}:5555`);
+
+    } catch (err: any) {
+      console.error('Wireless setup failed:', err);
+      // Fallback message for common IP route failure on some devices
+      if (err.message && err.message.includes('Could not find')) {
+        setError('Could not find IP. Make sure phone is on WiFi.');
+      } else {
+        setError('Wireless setup failed: ' + err.message);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -336,12 +393,22 @@ export default function Home() {
               </button>
             </div>
 
-            <button
-              onClick={disconnectDevice}
-              className="text-neutral-500 hover:text-red-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
-            >
-              <LogOut className="w-4 h-4" /> Disconnect
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={enableWireless}
+                className="text-neutral-500 hover:text-indigo-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20"
+                title="Enable Wireless Debugging"
+              >
+                <Wifi className="w-4 h-4" /> Wireless
+              </button>
+
+              <button
+                onClick={disconnectDevice}
+                className="text-neutral-500 hover:text-red-400 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
+              >
+                <LogOut className="w-4 h-4" /> Disconnect
+              </button>
+            </div>
           </div>
         )}
 
@@ -424,8 +491,8 @@ export default function Home() {
               {/* CSS Preview Layer */}
               <div
                 className={`relative shadow-2xl transition-all duration-500 ease-spring ${frameStyle === 'none' ? '' :
-                    frameStyle === 'phone' ? 'p-3 bg-neutral-900 rounded-[2.5rem] ring-4 ring-neutral-800 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]' :
-                      'p-6 bg-neutral-800 rounded-[2rem] ring-4 ring-neutral-700 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]'
+                  frameStyle === 'phone' ? 'p-3 bg-neutral-900 rounded-[2.5rem] ring-4 ring-neutral-800 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]' :
+                    'p-6 bg-neutral-800 rounded-[2rem] ring-4 ring-neutral-700 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]'
                   }`}
                 style={{
                   boxShadow: frameStyle !== 'none' ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : undefined
